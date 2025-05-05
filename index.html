@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>All Orders Summary</title>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #f4f6f9;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1, h2 {
+      color: #222;
+    }
+
+    ul {
+      list-style-type: none;
+      padding: 0;
+    }
+
+    li {
+      background: #fff;
+      margin: 8px 0;
+      padding: 10px 14px;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    a {
+      text-decoration: none;
+      color: #007acc;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .amount {
+      float: right;
+      color: green;
+    }
+
+    button {
+      background: #007acc;
+      color: white;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-bottom: 15px;
+    }
+
+    button:hover {
+      background: #005fa3;
+    }
+
+    #csv-view {
+      display: none;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    th, td {
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+    }
+
+    th {
+      background: #e9ecef;
+      position: relative;
+    }
+
+    .filters input {
+      width: 100%;
+      padding: 4px;
+      margin-top: 4px;
+      font-size: 0.9em;
+    }
+
+    .sort-btns {
+      font-size: 0.8em;
+      margin-top: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .sort-btns button {
+      background: none;
+      border: none;
+      color: #007acc;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="main-view">
+    <h1>All Orders Summary</h1>
+    <ul id="file-list"></ul>
+    <h2>Gross Total: <span class="amount" id="gross-total">₹0</span></h2>
+  </div>
+
+  <div id="csv-view">
+    <button onclick="showMainView()">← Back to Summary</button>
+    <h2 id="csv-title"></h2>
+    <div id="csv-total"></div>
+    <table id="csv-table"></table>
+  </div>
+
+  <script>
+    const files = [
+      { name: "Fire And Emergency Services", file: "fb.csv" },
+      { name: "Fire And Emergency Services Power", file: "fb_power.csv" },
+      { name: "Vehicle Pool", file: "vp.csv" },
+      { name: "Vehicle Pool Power", file: "vp_power.csv" },
+      { name: "Central Workshop", file: "ws.csv" },
+      { name: "Central Workshop Power", file: "ws_power.csv" },
+      { name: "All Pending Orders", file: "all_panding_orders.csv" }
+    ];
+
+    const fileListEl = document.getElementById("file-list");
+    const grossTotalEl = document.getElementById("gross-total");
+    const mainView = document.getElementById("main-view");
+    const csvView = document.getElementById("csv-view");
+    const csvTitle = document.getElementById("csv-title");
+    const csvTotal = document.getElementById("csv-total");
+    const csvTable = document.getElementById("csv-table");
+
+    let grossTotal = 0;
+
+    function cleanAmount(val) {
+      if (!val) return 0;
+      val = val.replace(/\/-/, '').replace(/,/g, '').replace(/[^\d.-]/g, '').trim();
+      return parseFloat(val) || 0;
+    }
+
+    function showMainView() {
+      csvView.style.display = "none";
+      mainView.style.display = "block";
+    }
+
+    function showCSVView(fileName, headers, rows, total) {
+      mainView.style.display = "none";
+      csvView.style.display = "block";
+      csvTitle.textContent = fileName;
+      csvTotal.textContent = "Total: ₹" + total.toLocaleString();
+
+      // Clear previous
+      csvTable.innerHTML = "";
+
+      const thead = document.createElement("thead");
+      const headRow = document.createElement("tr");
+
+      headers.forEach(h => {
+        const th = document.createElement("th");
+
+        const label = document.createElement("div");
+        label.textContent = h;
+
+        const input = document.createElement("input");
+        input.placeholder = `Filter ${h}`;
+        input.addEventListener("input", () => renderTable());
+
+        const sortDiv = document.createElement("div");
+        sortDiv.className = "sort-btns";
+
+        const sortAsc = document.createElement("button");
+        sortAsc.textContent = "↑";
+        sortAsc.onclick = () => {
+          rows.sort((a, b) => {
+            const aVal = a[h] || '';
+            const bVal = b[h] || '';
+            if (!isNaN(cleanAmount(aVal)) && !isNaN(cleanAmount(bVal))) {
+              return cleanAmount(aVal) - cleanAmount(bVal);
+            }
+            return aVal.localeCompare(bVal);
+          });
+          renderTable();
+        };
+
+        const sortDesc = document.createElement("button");
+        sortDesc.textContent = "↓";
+        sortDesc.onclick = () => {
+          rows.sort((a, b) => {
+            const aVal = a[h] || '';
+            const bVal = b[h] || '';
+            if (!isNaN(cleanAmount(aVal)) && !isNaN(cleanAmount(bVal))) {
+              return cleanAmount(bVal) - cleanAmount(aVal);
+            }
+            return bVal.localeCompare(aVal);
+          });
+          renderTable();
+        };
+
+        sortDiv.appendChild(sortAsc);
+        sortDiv.appendChild(sortDesc);
+
+        th.appendChild(label);
+        th.appendChild(input);
+        th.appendChild(sortDiv);
+        th.setAttribute("data-header", h);
+        headRow.appendChild(th);
+      });
+
+      thead.appendChild(headRow);
+      csvTable.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      csvTable.appendChild(tbody);
+
+      function renderTable() {
+        const filters = {};
+        csvTable.querySelectorAll("th").forEach(th => {
+          const header = th.getAttribute("data-header");
+          const input = th.querySelector("input");
+          if (input && input.value !== "") {
+            filters[header] = input.value.toLowerCase();
+          }
+        });
+
+        tbody.innerHTML = "";
+        rows.forEach(row => {
+          let match = true;
+          for (let key in filters) {
+            const cellVal = (row[key] || "").toLowerCase();
+            if (!cellVal.includes(filters[key])) {
+              match = false;
+              break;
+            }
+          }
+          if (match) {
+            const tr = document.createElement("tr");
+            headers.forEach(h => {
+              const td = document.createElement("td");
+              td.textContent = row[h] || '';
+              tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+          }
+        });
+      }
+
+      renderTable();
+    }
+
+    function fetchAndProcessCSV(fileName, fileLabel) {
+      return fetch(fileName)
+        .then(res => res.text())
+        .then(text => {
+          if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+          const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+          const headers = parsed.meta.fields;
+          const data = parsed.data;
+
+          const amountKey = headers.find(h => h.toLowerCase() === "amount");
+          const orderKey = headers.find(h => h.toLowerCase() === "order");
+          const proKey = headers.find(h => h.toLowerCase() === "pro");
+
+          let fileSum = 0;
+
+          const isPower = /_power\.csv$/i.test(fileName);
+          const isPending = /all_panding_orders\.csv$/i.test(fileName);
+          const isProBased = /^(vp|fb|ws)\.csv$/i.test(fileName);
+
+          data.forEach(row => {
+            const amount = cleanAmount(row[amountKey]);
+            const order = (row[orderKey] || "").trim();
+            const pro = (row[proKey] || "").trim();
+
+            if ((isPower || isPending) && !order) {
+              fileSum += amount;
+            } else if (isProBased && !pro) {
+              fileSum += amount;
+            }
+          });
+
+          grossTotal += fileSum;
+
+          const li = document.createElement("li");
+          const link = document.createElement("a");
+          link.textContent = fileLabel;
+          link.href = "#";
+          link.addEventListener("click", e => {
+            e.preventDefault();
+            showCSVView(fileLabel, headers, data, fileSum);
+          });
+
+          const amtSpan = document.createElement("span");
+          amtSpan.className = "amount";
+          amtSpan.textContent = "₹" + fileSum.toLocaleString();
+
+          li.appendChild(link);
+          li.appendChild(amtSpan);
+          fileListEl.appendChild(li);
+        });
+    }
+
+    files.forEach(({ name, file }) => {
+      fetchAndProcessCSV(file, name);
+    });
+
+    grossTotalEl.textContent = "₹" + grossTotal.toLocaleString();
+  </script>
+</body>
+</html>
+
