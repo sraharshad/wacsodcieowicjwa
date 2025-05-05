@@ -266,7 +266,7 @@
 
           const isPower = /_Power\.csv$/i.test(fileName);
           const isPending = /All_Panding_Orders\.csv$/i.test(fileName);
-          const isProBased = /^(VP|FB|WS)\.csv$/i.test(fileName);
+          const isProBased = /VP|FB|WS\.csv$/i.test(fileName);
 
           data.forEach(row => {
             const amount = cleanAmount(row[amountKey]);
