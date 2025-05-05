@@ -115,13 +115,13 @@
 
   <script>
     const files = [
-      { name: "Fire And Emergency Services", file: "FB.csv" },
-      { name: "Fire And Emergency Services Power", file: "FB_Power.csv" },
-      { name: "Vehicle Pool", file: "VP.csv" },
-      { name: "Vehicle Pool Power", file: "VP_Power.csv" },
-      { name: "Central Workshop", file: "WS.csv" },
-      { name: "Central Workshop Power", file: "WS_Power.csv" },
-      { name: "All Pending Orders", file: "All_Panding_Orders.csv" }
+      { name: "Fire And Emergency Services", file: "./FB.csv" },
+      { name: "Fire And Emergency Services Power", file: "./FB_Power.csv" },
+      { name: "Vehicle Pool", file: "./VP.csv" },
+      { name: "Vehicle Pool Power", file: "./VP_Power.csv" },
+      { name: "Central Workshop", file: "./WS.csv" },
+      { name: "Central Workshop Power", file: "./WS_Power.csv" },
+      { name: "All Pending Orders", file: "./All_Panding_Orders.csv" }
     ];
 
     const fileListEl = document.getElementById("file-list");
@@ -264,8 +264,8 @@
 
           let fileSum = 0;
 
-          const isPower = /_power\.csv$/i.test(fileName);
-          const isPending = /all_panding_orders\.csv$/i.test(fileName);
+          const isPower = /_Power\.csv$/i.test(fileName);
+          const isPending = /All_Panding_Orders\.csv$/i.test(fileName);
           const isProBased = /^(vp|fb|ws)\.csv$/i.test(fileName);
 
           data.forEach(row => {
